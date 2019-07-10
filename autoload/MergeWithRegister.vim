@@ -183,7 +183,7 @@ function! s:SplitContentsIntoLines( contextKey, contents ) abort
 	let l:lines = split(l:contents, '\n', 1)
     else
 	if &cmdheight > 1
-	    redraw
+	    redraw! " Clear the previous echoed line.XXX: Somehow need to force a redraw here.
 	    call ingo#avoidprompt#Echo(l:contents)
 	endif
 	let l:splitPattern = input('Enter separator pattern to temporarily split the single line: ', get(s:context, 'splitPattern', ''))
@@ -193,6 +193,7 @@ function! s:SplitContentsIntoLines( contextKey, contents ) abort
 	    let s:context.splitPattern = l:splitPattern
 	    let s:context[a:contextKey].splitPattern = l:splitPattern
 	    let l:lines = split(l:contents, printf('\%%(%s\)\zs', l:splitPattern), 1)
+	    let s:context[a:contextKey].elementNum = len(l:lines)
 	endif
     endif
     return l:lines
@@ -224,21 +225,21 @@ endfunction
 function! s:GetScratchLines( contextKey ) abort
     let l:lines = getline(1, line('$'))
     return (has_key(s:context[a:contextKey], 'splitPattern') ?
-    \   [join(l:lines, '')] :
-    \   l:lines
+    \   [len(l:lines), [join(l:lines, '')]] :
+    \   [len(l:lines), l:lines]
     \)
 endfunction
 function! MergeWithRegister#WriteText() abort
-    let l:lines = s:GetScratchLines('text')
+    let [l:elementNum, l:lines] = s:GetScratchLines('text')
     let s:context.result = join(l:lines, "\n") . (s:context.mode =~# '^[lV]$' ? "\n" : '')
     setlocal nomodified
-    call s:Report('Replacing', s:context.text.previousLineNum, len(l:lines), 'text')
+    call s:ReportForContextKey('text', 'Replacing', l:elementNum, len(l:lines), 'text')
 endfunction
 function! MergeWithRegister#WriteRegister() abort
-    let l:lines = s:GetScratchLines('register')
+    let [l:elementNum, l:lines] = s:GetScratchLines('register')
     call setreg(s:register, l:lines, getregtype(s:register)[0]) " Keep the original regtype (but not the width of a blockwise selection!).
     setlocal nomodified
-    call s:Report('Updated', s:context.register.previousLineNum, len(l:lines), 'register ' . s:register)
+    call s:ReportForContextKey('register', 'Updated', l:elementNum, len(l:lines), 'register ' . s:register)
 endfunction
 function! MergeWithRegister#EndMerge() abort
     if ! exists('s:context') | return | endif   " Safety check for being invoked multiple times.
@@ -331,14 +332,22 @@ function! MergeWithRegister#MergeResult( result, mode ) abort
 endfunction
 
 function! s:Report( action, oldLineNum, newLineNum, ... ) abort
-    echomsg printf('%s %d line%s%s',
+    let l:what = (a:0 >= 2 && ! empty(a:2) ? a:2 : 'line')
+    echomsg printf('%s %d %s%s%s',
     \   a:action,
-    \   a:oldLineNum, (a:oldLineNum == 1 ? '' : 's'),
+    \   a:oldLineNum, l:what, (a:oldLineNum == 1 ? '' : 's'),
     \   (a:0 ? ' in ' . a:1 : '')
     \) . (a:oldLineNum == a:newLineNum ?
     \   '' :
-    \   printf(' with %d line%s', a:newLineNum, (a:newLineNum == 1 ? '' : 's'))
+    \   printf(' with %d %s%s', a:newLineNum, l:what, (a:newLineNum == 1 ? '' : 's'))
     \)
+endfunction
+function! s:ReportForContextKey( contextKey, action, elementNum, newLineNum, what ) abort
+    if has_key(s:context[a:contextKey], 'elementNum')
+	call s:Report(a:action, s:context[a:contextKey].elementNum, a:elementNum, a:what, 'element')
+    else
+	call s:Report(a:action, s:context[a:contextKey].previousLineNum, a:newLineNum, a:what)
+    endif
 endfunction
 
 " vim: set ts=8 sts=4 sw=4 noexpandtab ff=unix fdm=syntax :
