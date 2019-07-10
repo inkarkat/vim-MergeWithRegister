@@ -61,7 +61,7 @@ function! MergeWithRegister#Operator( type, ... )
     let l:regType = getregtype(s:register)
     let l:isCorrected = s:CorrectForRegtype(a:type, s:register, l:regType, l:pasteText)
     try
-	call s:MergeWithRegister(a:type)
+	call s:MergeWithRegister(a:type, (a:0 ? a:1 : ''), (a:0 >= 2 && a:2))
     finally
 	if l:isCorrected
 	    " Undo the temporary change of the register.
@@ -70,19 +70,6 @@ function! MergeWithRegister#Operator( type, ... )
 	    call setreg(s:register, l:pasteText, l:regType)
 	endif
     endtry
-
-    if a:0
-	if a:0 >= 2 && a:2
-	    silent! call repeat#set(a:1, s:count)
-	else
-	    silent! call repeat#set(a:1)
-	endif
-    elseif s:register ==# '='
-	" Employ repeat.vim to have the expression re-evaluated on repetition of
-	" the operator-pending mapping.
-	silent! call repeat#set("\<Plug>MergeWithRegisterExpressionSpecial")
-    endif
-    silent! call visualrepeat#set("\<Plug>MergeWithRegisterVisual")
 endfunction
 function! MergeWithRegister#OperatorExpression()
     call MergeWithRegister#SetRegister()
@@ -114,10 +101,12 @@ endfunction
 
 
 
-function! s:MergeWithRegister( type )
+function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount )
     if a:type ==# 'visual'
 	let s:context = {
 	\   'type': a:type,
+	\   'repeatMapping': a:repeatMapping,
+	\   'isUseRepeatCount': a:isUseRepeatCount,
 	\   'previousLineNum': line("'>") - line("'<") + 1,
 	\   'startPos': getpos("'<"),
 	\   'endPos': getpos("'>"),
@@ -217,6 +206,8 @@ function! MergeWithRegister#WriteRegister() abort
     call s:Report('Updated', s:context.registerLineNum, len(l:lines), 'register ' . s:register)
 endfunction
 function! MergeWithRegister#EndMerge() abort
+    if ! exists('s:context') | return | endif   " Safety check for being invoked multiple times.
+
     for l:bufNr in s:context.buffers
 	let l:winNr = bufwinnr(l:bufNr)
 	if l:winNr == -1 | continue | endif
@@ -239,6 +230,21 @@ function! MergeWithRegister#EndMerge() abort
 	\   s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's')
 	\)
     endif
+
+    if ! empty(s:context.repeatMapping)
+	if s:context.isUseRepeatCount
+	    silent! call repeat#set(s:context.repeatMapping, s:count)
+	else
+	    silent! call repeat#set(s:context.repeatMapping)
+	endif
+    elseif s:register ==# '='
+	" Employ repeat.vim to have the expression re-evaluated on repetition of
+	" the operator-pending mapping.
+	silent! call repeat#set("\<Plug>MergeWithRegisterExpressionSpecial")
+    endif
+    silent! call visualrepeat#set("\<Plug>MergeWithRegisterVisual")
+
+    unlet s:context
 endfunction
 function! MergeWithRegister#MergeResult( result, mode ) abort
     " With a put in visual mode, the selected text will be replaced with the
