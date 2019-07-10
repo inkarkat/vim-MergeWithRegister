@@ -163,10 +163,19 @@ function! s:StartMerge() abort
     let l:text = s:context.text
     let l:register = s:GetRegisterContents()
     let l:name = expand('%:t') | if empty(l:name) | let l:name = 'unnamed' | endif
+    let l:tabPrefixCommand = (g:MergeWithRegister_UseDiff && ingo#window#special#HasDiffWindow() ? 'tab ' : '') " DWIM: Open scratch buffers in a separate tab page if we're already diffing here.
 
     try
-	call s:OpenScratch(1, g:MergeWithRegister_ScratchSplitCommand, l:name, s:context.text, function('MergeWithRegister#WriteText'))
-	call s:OpenScratch(ingo#register#IsWritable(s:register), g:MergeWithRegister_SecondSplitCommand, 'register ' . s:register, s:GetRegisterContents(), function('MergeWithRegister#WriteRegister'))
+	call s:OpenScratch(
+	\   1, l:tabPrefixCommand . g:MergeWithRegister_ScratchSplitCommand,
+	\   l:name, s:context.text,
+	\   function('MergeWithRegister#WriteText')
+	\)
+	call s:OpenScratch(
+	\   ingo#register#IsWritable(s:register), g:MergeWithRegister_SecondSplitCommand,
+	\   'register ' . s:register, s:GetRegisterContents(),
+	\   function('MergeWithRegister#WriteRegister')
+	\)
 	wincmd p
     catch /^MergeWithRegister:/
 	call ingo#msg#CustomExceptionMsg('MergeWithRegister')
