@@ -107,34 +107,40 @@ function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount )
 	\   'type': a:type,
 	\   'repeatMapping': a:repeatMapping,
 	\   'isUseRepeatCount': a:isUseRepeatCount,
-	\   'previousLineNum': line("'>") - line("'<") + 1,
+	\   'text': {
+	\       'previousLineNum': line("'>") - line("'<") + 1,
+	\   },
+	\   'register': {},
 	\   'startPos': getpos("'<"),
 	\   'endPos': getpos("'>"),
 	\   'mode': visualmode(),
 	\}
 
-	let s:context.text = (&selection ==# 'exclusive' && getpos("'<") == getpos("'>") ?
+	let s:context.text.contents = (&selection ==# 'exclusive' && getpos("'<") == getpos("'>") ?
 	\   '' :
 	\   ingo#selection#Get()
 	\)
     else
 	let s:context = {
 	\   'type': a:type,
-	\   'previousLineNum': line("']") - line("'[") + 1,
+	\   'text': {
+	\       'previousLineNum': line("']") - line("'[") + 1,
+	\   },
+	\   'register': {},
 	\   'startPos': getpos("'["),
 	\   'endPos': getpos("']"),
 	\   'mode': a:type[0],
 	\}
 
 	if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
-	    let s:context.text = ''
+	    let s:context.text.contents = ''
 	else
 	    " Note: Need to use an "inclusive" selection to make `] include
 	    " the last moved-over character.
 	    let l:save_selection = &selection
 	    set selection=inclusive
 	    try
-		let s:context.text = ingo#register#KeepRegisterExecuteOrFunc(
+		let s:context.text.contents = ingo#register#KeepRegisterExecuteOrFunc(
 		    \'execute "silent normal! g`[' . (a:type ==# 'line' ? 'V' : 'v') . 'g`]y" | return @"'
 		\)
 	    finally
@@ -155,24 +161,25 @@ function! s:StartMerge() abort
 
     try
 	call s:OpenScratch(
+	\   'text',
 	\   1, l:tabPrefixCommand . g:MergeWithRegister_ScratchSplitCommand,
-	\   l:name, s:context.text,
+	\   l:name, s:context.text.contents,
 	\   function('MergeWithRegister#WriteText')
 	\)
 	call s:OpenScratch(
+	\   'register',
 	\   ingo#register#IsWritable(s:register), g:MergeWithRegister_SecondSplitCommand,
 	\   'register ' . s:register, s:GetRegisterContents(),
-	\   function('MergeWithRegister#WriteRegister'),
-	\   'registerLineNum'
+	\   function('MergeWithRegister#WriteRegister')
 	\)
 	wincmd p
     catch /^MergeWithRegister:/
 	call ingo#msg#CustomExceptionMsg('MergeWithRegister')
     endtry
 endfunction
-function! s:OpenScratch( isWritable, splitCommand, name, contents, Writer, ... ) abort
+function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, Writer ) abort
     let l:lines = split(substitute(a:contents, '\n$', '', ''), '\n', 1)
-    if a:0 | let s:context[a:1] = len(l:lines) | endif  " Also tally registerLineNum; we already know s:context.previousLineNum.
+    if ! has_key(s:context[a:contextKey], 'previousLineNum') | let s:context[a:contextKey].previousLineNum = len(l:lines) | endif  " Also tally the previous number of lines in the register; we already know s:context.previousLineNum.
     if ! (a:isWritable ?
     \   ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, l:lines, a:splitCommand) :
     \   ingo#buffer#scratch#Create('', a:name, 0, l:lines, a:splitCommand)
@@ -197,13 +204,13 @@ function! MergeWithRegister#WriteText() abort
     let l:lines = getline(1, line('$'))
     let s:context.result = join(l:lines, "\n") . (s:context.mode =~# '^[lV]$' ? "\n" : '')
     setlocal nomodified
-    call s:Report('Replacing', s:context.previousLineNum, len(l:lines), 'text')
+    call s:Report('Replacing', s:context.text.previousLineNum, len(l:lines), 'text')
 endfunction
 function! MergeWithRegister#WriteRegister() abort
     let l:lines = getline(1, line('$'))
     call setreg(s:register, l:lines, getregtype(s:register)[0]) " Keep the original regtype (but not the width of a blockwise selection!).
     setlocal nomodified
-    call s:Report('Updated', s:context.registerLineNum, len(l:lines), 'register ' . s:register)
+    call s:Report('Updated', s:context.register.previousLineNum, len(l:lines), 'register ' . s:register)
 endfunction
 function! MergeWithRegister#EndMerge() abort
     if ! exists('s:context') | return | endif   " Safety check for being invoked multiple times.
@@ -227,7 +234,7 @@ function! MergeWithRegister#EndMerge() abort
     else
 	echomsg printf('No update to %s%d line%s',
 	\   (s:context.type ==# 'visual' ? 'selected ' : ''),
-	\   s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's')
+	\   s:context.text.previousLineNum, (s:context.text.previousLineNum == 1 ? '' : 's')
 	\)
     endif
 
@@ -261,7 +268,7 @@ function! MergeWithRegister#MergeResult( result, mode ) abort
 	call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), a:result)
     endif
 
-    if empty(s:context.text)
+    if empty(s:context.text.contents)
 	" In case of an empty text / selection, just paste before the cursor
 	" position.
 	silent normal! P
@@ -292,7 +299,7 @@ function! MergeWithRegister#MergeResult( result, mode ) abort
 
     let l:newLineNum = line("']") - line("'[") + 1
     redraw  " Clear previous "Replacing ..." message.
-    call s:Report('Replaced', s:context.previousLineNum, l:newLineNum)
+    call s:Report('Replaced', s:context.text.previousLineNum, l:newLineNum)
 endfunction
 
 function! s:Report( action, oldLineNum, newLineNum, ... ) abort
