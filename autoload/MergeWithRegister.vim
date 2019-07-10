@@ -214,8 +214,11 @@ function! MergeWithRegister#EndMerge() abort
     endfor
 
     call win_gotoid(s:context.winId)   " TODO: Better impl
+    if has_key(s:context, 'result')
+	call ingo#register#KeepRegisterExecuteOrFunc(function('MergeWithRegister#MergeResult'), s:context.result)
+    endif
 endfunction
-function! MergeWithRegister#Merged() abort
+function! MergeWithRegister#MergeResult( result ) abort
     " With a put in visual mode, the selected text will be replaced with the
     " contents of the register. This works better than first deleting the
     " selection into the black-hole register and then doing the insert; as
@@ -225,45 +228,42 @@ function! MergeWithRegister#Merged() abort
     " autoindenting.
     " With a put in visual mode, the previously selected text is put in the
     " unnamed register, so we need to save and restore that.
-    let l:save_clipboard = &clipboard
-    set clipboard= " Avoid clobbering the selection and clipboard registers.
-    let l:save_reg = getreg('"')
-    let l:save_regmode = getregtype('"')
+    call setreg('"', a:result)
+    if s:register ==# '='
+	call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), a:result)
+    endif
 
-    try
-	let l:result = get(s:context, 'result', 'TODO')
-	call setreg('"', l:result)
-	if s:register ==# '='
-	    call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), l:result)
+    if empty(s:context.text)
+	" In case of an empty text / selection, just paste before the cursor
+	" position.
+	silent normal! P
+    elseif s:context.type ==# 'visual'
+	if (s:context.startPos != getpos("'<") ||
+	\   s:context.endPos != getpos("'>") ||
+	\   s:context.mode != visualmode()
+	\)
+	    " Recreate the initial selection in case it was clobbered (which is
+	    " unlikely, but nothing prevents the user from going back to the
+	    " original window and selecting new things).
+	    call ingo#selection#Set(s:context.startPos, s:context.endPos, s:context.mode)
 	endif
+	silent normal! gvp
+    else
+	call ingo#change#Set(s:context.startPos, s:context.endPos)
 
-	if empty(s:context.text)
-	    " In case of an empty text / selection, just paste before the cursor
-	    " position.
-	    silent normal! P
-	elseif s:context.type ==# 'visual'
-	    " TODO: Reestablish selection.
-	    silent normal! gvp
-	else
-	    call ingo#change#Set(s:context.startPos, s:context.endPos)
+	" Note: Need to use an "inclusive" selection to make `] include
+	" the last moved-over character.
+	let l:save_selection = &selection
+	set selection=inclusive
+	try
+	    execute 'silent normal! g`[' . (s:context.type ==# 'line' ? 'V' : 'v') . 'g`]p'
+	finally
+	    let &selection = l:save_selection
+	endtry
+    endif
 
-	    " Note: Need to use an "inclusive" selection to make `] include
-	    " the last moved-over character.
-	    let l:save_selection = &selection
-	    set selection=inclusive
-	    try
-		execute 'silent normal! g`[' . (s:context.type ==# 'line' ? 'V' : 'v') . 'g`]p'
-	    finally
-		let &selection = l:save_selection
-	    endtry
-	endif
-
-	let l:newLineNum = line("']") - line("'[") + 1
-	call s:Report(&report, 'Replaced', l:newLineNum)
-    finally
-	call setreg('"', l:save_reg, l:save_regmode)
-	let &clipboard = l:save_clipboard
-    endtry
+    let l:newLineNum = line("']") - line("'[") + 1
+    call s:Report(&report, 'Replaced', l:newLineNum)
 endfunction
 
 function! s:Report( report, action, newLineNum, ... ) abort
