@@ -76,7 +76,7 @@ function! s:MergeWithRegister( type )
 	\   'previousLineNum': line("']") - line("'[") + 1,
 	\   'startPos': getpos("'["),
 	\   'endPos': getpos("']"),
-	\   'mode': '',
+	\   'mode': a:type[0],
 	\}
 
 	if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
@@ -215,10 +215,10 @@ function! MergeWithRegister#EndMerge() abort
 
     call win_gotoid(s:context.winId)   " TODO: Better impl
     if has_key(s:context, 'result')
-	call ingo#register#KeepRegisterExecuteOrFunc(function('MergeWithRegister#MergeResult'), s:context.result)
+	call ingo#register#KeepRegisterExecuteOrFunc(function('MergeWithRegister#MergeResult'), s:context.result, s:context.mode)
     endif
 endfunction
-function! MergeWithRegister#MergeResult( result ) abort
+function! MergeWithRegister#MergeResult( result, mode ) abort
     " With a put in visual mode, the selected text will be replaced with the
     " contents of the register. This works better than first deleting the
     " selection into the black-hole register and then doing the insert; as
@@ -228,7 +228,7 @@ function! MergeWithRegister#MergeResult( result ) abort
     " autoindenting.
     " With a put in visual mode, the previously selected text is put in the
     " unnamed register, so we need to save and restore that.
-    call setreg('"', a:result)
+    call setreg('"', a:result, a:mode)
     if s:register ==# '='
 	call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), a:result)
     endif
