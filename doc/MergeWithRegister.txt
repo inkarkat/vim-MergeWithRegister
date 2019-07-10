@@ -1,0 +1,137 @@
+*MergeWithRegister.txt* Merge text with the contents of a register.
+
+		    MERGE WITH REGISTER    by Ingo Karkat
+						       *MergeWithRegister.vim*
+description			|MergeWithRegister-description|
+usage				|MergeWithRegister-usage|
+installation			|MergeWithRegister-installation|
+configuration			|MergeWithRegister-configuration|
+integration			|MergeWithRegister-integration|
+limitations			|MergeWithRegister-limitations|
+known problems			|MergeWithRegister-known-problems|
+todo				|MergeWithRegister-todo|
+history				|MergeWithRegister-history|
+
+==============================================================================
+DESCRIPTION				       *MergeWithRegister-description*
+
+This plugin ...
+
+HOW IT WORKS								     *
+
+SOURCE									     *
+(Original Vim tip, Stack Overflow answer, ...)
+
+SEE ALSO								     *
+(Plugins offering complementary functionality, or plugins using this library.)
+
+RELATED WORKS								     *
+(Alternatives from other authors, other approaches, references not used here.)
+
+==============================================================================
+USAGE						     *MergeWithRegister-usage*
+							     *mr* *mrr* *v_mr*
+[count]["x]mr{motion}	Merge {motion} text with the contents of register x.
+			This opens two scratch buffers (split in the same tab,
+			or in a separate tab if there already are diff
+			windows), one with the original text from the buffer
+			and one with the register contents. If either just
+			consists of a single line, it asks for a split pattern
+			and then temporarily the contents (keeping the
+			separators at each line's end), and automatically
+			rejoins when done. |diff-mode| can be automatically
+			enabled (|g:MergeWithRegister_UseDiff|), and you can
+			pick and exchange contents between both. A |:write|
+			will cause an update of the underlying data. |:quit|
+			or |:close| of any of the two diff buffers will end
+			the merge session. If the original text has been
+			modified and written, the original ({motion}) area
+			will be updated.
+[count]["x]mrr		Merge [count] lines with the contents of register x.
+			To replace from the cursor position to the end of the
+			line use ["x]mr$
+{Visual}["x]mr		Merge the selection with the contents of register x.
+								  *mrR* *v_mR*
+[count]["x]mrR		Merge [count] lines with the contents of register x
+			while ignoring any common indent. When updating, the
+			indent is adjusted to the first replaced line (like
+			pasting with |]p|).
+{Visual}["x]mR		Merge the selection with the contents of register x
+			and adjust the indent to the first selected line.
+			As the replacement is always entire lines, this only
+			works with linewise selections (|V|).
+
+==============================================================================
+INSTALLATION				      *MergeWithRegister-installation*
+
+The code is hosted in a Git repo at
+    https://github.com/inkarkat/vim-MergeWithRegister
+You can use your favorite plugin manager, or "git clone" into a directory used
+for Vim |packages|. Releases are on the "stable" branch, the latest unstable
+development snapshot on "master".
+
+This script is also packaged as a |vimball|. If you have the "gunzip"
+decompressor in your PATH, simply edit the *.vmb.gz package in Vim; otherwise,
+decompress the archive first, e.g. using WinZip. Inside Vim, install by
+sourcing the vimball or via the |:UseVimball| command. >
+    vim MergeWithRegister*.vmb.gz
+    :so %
+To uninstall, use the |:RmVimball| command.
+
+DEPENDENCIES				      *MergeWithRegister-dependencies*
+
+- Requires Vim 7.0 or higher.
+
+==============================================================================
+CONFIGURATION				     *MergeWithRegister-configuration*
+
+For a permanent configuration, put the following commands into your |vimrc|:
+						 *g:MergeWithRegister_UseDiff*
+By default, 'diff' will be automatically enabled on both scratch buffers. To
+turn this off: >
+    let g:MergeWithRegister_UseDiff = 0
+<				     *g:MergeWithRegister_ScratchSplitCommand*
+The split command to open the first scratch buffer (for the original text from
+the buffer): >
+    let g:MergeWithRegister_ScratchSplitCommand = 'rightbelow split'
+<				      *g:MergeWithRegister_SecondSplitCommand*
+The split command to open the second scratch buffer (for the register
+contents): >
+    let g:MergeWithRegister_SecondSplitCommand = 'rightbelow vsplit'
+<
+
+						     *MergeWithRegister-remap*
+plugmap
+==============================================================================
+INTEGRATION				       *MergeWithRegister-integration*
+
+==============================================================================
+LIMITATIONS				       *MergeWithRegister-limitations*
+
+KNOWN PROBLEMS				    *MergeWithRegister-known-problems*
+
+TODO						      *MergeWithRegister-todo*
+
+IDEAS						     *MergeWithRegister-ideas*
+
+CONTRIBUTING					*MergeWithRegister-contribute*
+
+Report any bugs, send patches, or suggest features via the issue tracker at
+https://github.com/inkarkat/vim-MergeWithRegister/issues or email (address below).
+
+==============================================================================
+HISTORY						   *MergeWithRegister-history*
+
+GOAL
+First published version.
+
+0.01	10-Jul-2019
+Started development.
+
+==============================================================================
+Copyright: (C) 2019 Ingo Karkat
+The VIM LICENSE applies to this plugin; see |copyright|.
+
+Maintainer:	Ingo Karkat <ingo@karkat.de>
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:
