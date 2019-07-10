@@ -160,7 +160,6 @@ function! s:StartMerge() abort
     let s:context.buffers = []
     let s:context.filetype = &l:filetype
     let s:context.currentBuffer = ingo#window#switches#WinSaveCurrentBuffer(1)
-    let l:text = s:context.text
     let l:register = s:GetRegisterContents()
     let l:name = expand('%:t') | if empty(l:name) | let l:name = 'unnamed' | endif
     let l:tabPrefixCommand = (g:MergeWithRegister_UseDiff && ingo#window#special#HasDiffWindow() ? 'tab ' : '') " DWIM: Open scratch buffers in a separate tab page if we're already diffing here.
@@ -174,17 +173,20 @@ function! s:StartMerge() abort
 	call s:OpenScratch(
 	\   ingo#register#IsWritable(s:register), g:MergeWithRegister_SecondSplitCommand,
 	\   'register ' . s:register, s:GetRegisterContents(),
-	\   function('MergeWithRegister#WriteRegister')
+	\   function('MergeWithRegister#WriteRegister'),
+	\   'registerLineNum'
 	\)
 	wincmd p
     catch /^MergeWithRegister:/
 	call ingo#msg#CustomExceptionMsg('MergeWithRegister')
     endtry
 endfunction
-function! s:OpenScratch( isWritable, splitCommand, name, contents, Writer ) abort
+function! s:OpenScratch( isWritable, splitCommand, name, contents, Writer, ... ) abort
+    let l:lines = split(substitute(a:contents, '\n$', '', ''), '\n', 1)
+    if a:0 | let s:context[a:1] = len(l:lines) | endif  " Also tally registerLineNum; we already know s:context.previousLineNum.
     if ! (a:isWritable ?
-    \   ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, split(a:contents, '\n', 1), a:splitCommand) :
-    \   ingo#buffer#scratch#Create('', a:name, 0, split(a:contents, '\n', 1), a:splitCommand)
+    \   ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, l:lines, a:splitCommand) :
+    \   ingo#buffer#scratch#Create('', a:name, 0, l:lines, a:splitCommand)
     \)
 	throw 'MergeWithRegister: Failed to open scratch buffer for ' . a:name
     endif
@@ -204,15 +206,15 @@ endfunction
 
 function! MergeWithRegister#WriteText() abort
     let l:lines = getline(1, line('$'))
-    let s:context.result = join(l:lines, "\n")
+    let s:context.result = join(l:lines, "\n") . (s:context.mode =~# '^[lV]$' ? "\n" : '')
     setlocal nomodified
-    call s:Report('Replacing', len(l:lines), 'text')
+    call s:Report('Replacing', s:context.previousLineNum, len(l:lines), 'text')
 endfunction
 function! MergeWithRegister#WriteRegister() abort
     let l:lines = getline(1, line('$'))
-    call setreg(s:register, join(l:lines, "\n"), getregtype(s:register)[0]) " Keep the original regtype (but not the width of a blockwise selection!).
+    call setreg(s:register, l:lines, getregtype(s:register)[0]) " Keep the original regtype (but not the width of a blockwise selection!).
     setlocal nomodified
-    call s:Report('Updated', len(l:lines), 'register ' . s:register)
+    call s:Report('Updated', s:context.registerLineNum, len(l:lines), 'register ' . s:register)
 endfunction
 function! MergeWithRegister#EndMerge() abort
     for l:bufNr in s:context.buffers
@@ -284,15 +286,15 @@ function! MergeWithRegister#MergeResult( result, mode ) abort
 
     let l:newLineNum = line("']") - line("'[") + 1
     redraw  " Clear previous "Replacing ..." message.
-    call s:Report('Replaced', l:newLineNum)
+    call s:Report('Replaced', s:context.previousLineNum, l:newLineNum)
 endfunction
 
-function! s:Report( action, newLineNum, ... ) abort
+function! s:Report( action, oldLineNum, newLineNum, ... ) abort
     echomsg printf('%s %d line%s%s',
     \   a:action,
-    \   s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's'),
+    \   a:oldLineNum, (a:oldLineNum == 1 ? '' : 's'),
     \   (a:0 ? ' in ' . a:1 : '')
-    \) . (s:context.previousLineNum == a:newLineNum ?
+    \) . (a:oldLineNum == a:newLineNum ?
     \   '' :
     \   printf(' with %d line%s', a:newLineNum, (a:newLineNum == 1 ? '' : 's'))
     \)
