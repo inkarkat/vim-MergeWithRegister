@@ -165,15 +165,18 @@ function! s:StartMerge() abort
     let l:name = expand('%:t') | if empty(l:name) | let l:name = 'unnamed' | endif
 
     try
-	call s:OpenScratch(g:MergeWithRegister_ScratchSplitCommand, l:name, s:context.text, function('MergeWithRegister#WriteText'))
-	call s:OpenScratch(g:MergeWithRegister_SecondSplitCommand, 'register ' . s:register, s:GetRegisterContents(), function('MergeWithRegister#WriteRegister'))
+	call s:OpenScratch(1, g:MergeWithRegister_ScratchSplitCommand, l:name, s:context.text, function('MergeWithRegister#WriteText'))
+	call s:OpenScratch(ingo#register#IsWritable(s:register), g:MergeWithRegister_SecondSplitCommand, 'register ' . s:register, s:GetRegisterContents(), function('MergeWithRegister#WriteRegister'))
 	wincmd p
     catch /^MergeWithRegister:/
 	call ingo#msg#CustomExceptionMsg('MergeWithRegister')
     endtry
 endfunction
-function! s:OpenScratch( splitCommand, name, contents, Writer ) abort
-    if ! ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, split(a:contents, '\n', 1), a:splitCommand)
+function! s:OpenScratch( isWritable, splitCommand, name, contents, Writer ) abort
+    if ! (a:isWritable ?
+    \   ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, split(a:contents, '\n', 1), a:splitCommand) :
+    \   ingo#buffer#scratch#Create('', a:name, 0, split(a:contents, '\n', 1), a:splitCommand)
+    \)
 	throw 'MergeWithRegister: Failed to open scratch buffer for ' . a:name
     endif
     call add(s:context.buffers, bufnr(''))
@@ -191,12 +194,16 @@ function! s:OpenScratch( splitCommand, name, contents, Writer ) abort
 endfunction
 
 function! MergeWithRegister#WriteText() abort
-    echomsg '**** writing text'
+    let l:lines = getline(1, line('$'))
+    let s:context.result = join(l:lines, "\n")
     setlocal nomodified
+    call s:Report(0, 'Replacing', len(l:lines), 'text')
 endfunction
 function! MergeWithRegister#WriteRegister() abort
-    echomsg '**** writing register'
+    let l:lines = getline(1, line('$'))
+    call setreg(s:register, join(l:lines, "\n"), getregtype(s:register)[0]) " Keep the original regtype (but not the width of a blockwise selection!).
     setlocal nomodified
+    call s:Report(0, 'Updated', len(l:lines), 'register ' . s:register)
 endfunction
 function! MergeWithRegister#EndMerge() abort
     for l:bufNr in s:context.buffers
@@ -252,16 +259,19 @@ function! MergeWithRegister#Merged() abort
 	endif
 
 	let l:newLineNum = line("']") - line("'[") + 1
-	if s:context.previousLineNum >= &report || l:newLineNum >= &report
-	    echomsg printf('Replaced %d line%s', s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's')) .
-	    \   (s:context.previousLineNum == l:newLineNum ? '' : printf(' with %d line%s', l:newLineNum, (l:newLineNum == 1 ? '' : 's')))
-	endif
+	call s:Report(&report, 'Replaced', l:newLineNum)
     finally
 	call setreg('"', l:save_reg, l:save_regmode)
 	let &clipboard = l:save_clipboard
     endtry
 endfunction
 
+function! s:Report( report, action, newLineNum, ... ) abort
+    if s:context.previousLineNum >= a:report || a:newLineNum >= a:report
+	echomsg printf('%s %d line%s%s', a:action, s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's'), (a:0 ? ' in ' . a:1 : '')) .
+	    \(s:context.previousLineNum == a:newLineNum ? '' : printf(' with %d line%s', a:newLineNum, (a:newLineNum == 1 ? '' : 's')))
+    endif
+endfunction
 
 " Debugging
 function! MergeWithRegister#Context() abort
