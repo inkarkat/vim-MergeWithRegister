@@ -1,6 +1,7 @@
 " MergeWithRegister.vim: Merge text with the contents of a register.
 "
 " DEPENDENCIES:
+"   - ingo-library.vim plugin
 "   - repeat.vim (vimscript #2136) autoload script (optional)
 "   - visualrepeat.vim (vimscript #3848) autoload script (optional)
 "   - visualrepeat/reapply.vim autoload script (optional)
