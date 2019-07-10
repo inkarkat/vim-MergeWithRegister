@@ -95,59 +95,8 @@ function! s:MergeWithRegister( type )
 	    endtry
 	endif
     endif
-endfunction
-function! MergeWithRegister#Merged() abort
-    " With a put in visual mode, the selected text will be replaced with the
-    " contents of the register. This works better than first deleting the
-    " selection into the black-hole register and then doing the insert; as
-    " "d" + "i/a" has issues at the end-of-the line (especially with blockwise
-    " selections, where "v_o" can put the cursor at either end), and the "c"
-    " commands has issues with multiple insertion on blockwise selection and
-    " autoindenting.
-    " With a put in visual mode, the previously selected text is put in the
-    " unnamed register, so we need to save and restore that.
-    let l:save_clipboard = &clipboard
-    set clipboard= " Avoid clobbering the selection and clipboard registers.
-    let l:save_reg = getreg('"')
-    let l:save_regmode = getregtype('"')
 
-    try
-	let l:result = get(s:context, 'result', 'TODO')
-	call setreg('"', l:result)
-	if s:register ==# '='
-	    call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), l:result)
-	endif
-
-	if empty(s:context.text)
-	    " In case of an empty text / selection, just paste before the cursor
-	    " position.
-	    silent normal! P
-	elseif s:context.type ==# 'visual'
-	    " TODO: Reestablish selection.
-	    silent normal! gvp
-	else
-	    call ingo#change#Set(s:context.startPos, s:context.endPos)
-
-	    " Note: Need to use an "inclusive" selection to make `] include
-	    " the last moved-over character.
-	    let l:save_selection = &selection
-	    set selection=inclusive
-	    try
-		execute 'silent normal! g`[' . (s:context.type ==# 'line' ? 'V' : 'v') . 'g`]p'
-	    finally
-		let &selection = l:save_selection
-	    endtry
-	endif
-
-	let l:newLineNum = line("']") - line("'[") + 1
-	if s:context.previousLineNum >= &report || l:newLineNum >= &report
-	    echomsg printf('Replaced %d line%s', s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's')) .
-	    \   (s:context.previousLineNum == l:newLineNum ? '' : printf(' with %d line%s', l:newLineNum, (l:newLineNum == 1 ? '' : 's')))
-	endif
-    finally
-	call setreg('"', l:save_reg, l:save_regmode)
-	let &clipboard = l:save_clipboard
-    endtry
+    call s:StartMerge()
 endfunction
 function! MergeWithRegister#Operator( type, ... )
     let l:pasteText = getreg(s:register, 1) " Expression evaluation inside function context may cause errors, therefore get unevaluated expression when s:register ==# '='.
@@ -205,6 +154,116 @@ function! MergeWithRegister#VisualMode()
     return l:keys
 endfunction
 
+
+
+function! s:StartMerge() abort
+    let s:context.buffers = []
+    let s:context.filetype = &l:filetype
+    let s:context.winId = win_getid()   " TODO: Better impl
+    let l:text = s:context.text
+    let l:register = s:GetRegisterContents()
+    let l:name = expand('%:t') | if empty(l:name) | let l:name = 'unnamed' | endif
+
+    try
+	call s:OpenScratch(g:MergeWithRegister_ScratchSplitCommand, l:name, s:context.text, function('MergeWithRegister#WriteText'))
+	call s:OpenScratch(g:MergeWithRegister_SecondSplitCommand, 'register ' . s:register, s:GetRegisterContents(), function('MergeWithRegister#WriteRegister'))
+	wincmd p
+    catch /^MergeWithRegister:/
+	call ingo#msg#CustomExceptionMsg('MergeWithRegister')
+    endtry
+endfunction
+function! s:OpenScratch( splitCommand, name, contents, Writer ) abort
+    if ! ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, split(a:contents, '\n', 1), a:splitCommand)
+	throw 'MergeWithRegister: Failed to open scratch buffer for ' . a:name
+    endif
+    call add(s:context.buffers, bufnr(''))
+
+    " Detect the filetype the contents, and fall back to the original buffer's
+    " filetype.
+    filetype detect
+    if empty(&l:filetype) | let &l:filetype = s:context.filetype | endif
+
+    if g:MergeWithRegister_UseDiff | setl diff | endif
+
+    augroup MergeWithRegister
+	autocmd! BufHidden,BufUnload <buffer> call MergeWithRegister#EndMerge()
+    augroup END
+endfunction
+
+function! MergeWithRegister#WriteText() abort
+    echomsg '**** writing text'
+    setlocal nomodified
+endfunction
+function! MergeWithRegister#WriteRegister() abort
+    echomsg '**** writing register'
+    setlocal nomodified
+endfunction
+function! MergeWithRegister#EndMerge() abort
+    for l:bufNr in s:context.buffers
+	let l:winNr = bufwinnr(l:bufNr)
+	if l:winNr == -1 | continue | endif
+	noautocmd execute l:winNr . 'wincmd w'
+	silent! noautocmd close!    | " Use :noautocmd to avoid triggering us again recursively from the other scratch buffer.
+    endfor
+
+    call win_gotoid(s:context.winId)   " TODO: Better impl
+endfunction
+function! MergeWithRegister#Merged() abort
+    " With a put in visual mode, the selected text will be replaced with the
+    " contents of the register. This works better than first deleting the
+    " selection into the black-hole register and then doing the insert; as
+    " "d" + "i/a" has issues at the end-of-the line (especially with blockwise
+    " selections, where "v_o" can put the cursor at either end), and the "c"
+    " commands has issues with multiple insertion on blockwise selection and
+    " autoindenting.
+    " With a put in visual mode, the previously selected text is put in the
+    " unnamed register, so we need to save and restore that.
+    let l:save_clipboard = &clipboard
+    set clipboard= " Avoid clobbering the selection and clipboard registers.
+    let l:save_reg = getreg('"')
+    let l:save_regmode = getregtype('"')
+
+    try
+	let l:result = get(s:context, 'result', 'TODO')
+	call setreg('"', l:result)
+	if s:register ==# '='
+	    call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), l:result)
+	endif
+
+	if empty(s:context.text)
+	    " In case of an empty text / selection, just paste before the cursor
+	    " position.
+	    silent normal! P
+	elseif s:context.type ==# 'visual'
+	    " TODO: Reestablish selection.
+	    silent normal! gvp
+	else
+	    call ingo#change#Set(s:context.startPos, s:context.endPos)
+
+	    " Note: Need to use an "inclusive" selection to make `] include
+	    " the last moved-over character.
+	    let l:save_selection = &selection
+	    set selection=inclusive
+	    try
+		execute 'silent normal! g`[' . (s:context.type ==# 'line' ? 'V' : 'v') . 'g`]p'
+	    finally
+		let &selection = l:save_selection
+	    endtry
+	endif
+
+	let l:newLineNum = line("']") - line("'[") + 1
+	if s:context.previousLineNum >= &report || l:newLineNum >= &report
+	    echomsg printf('Replaced %d line%s', s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's')) .
+	    \   (s:context.previousLineNum == l:newLineNum ? '' : printf(' with %d line%s', l:newLineNum, (l:newLineNum == 1 ? '' : 's')))
+	endif
+    finally
+	call setreg('"', l:save_reg, l:save_regmode)
+	let &clipboard = l:save_clipboard
+    endtry
+endfunction
+
+
+" Debugging
 function! MergeWithRegister#Context() abort
     echomsg '****' s:register string(s:context)
 endfunction

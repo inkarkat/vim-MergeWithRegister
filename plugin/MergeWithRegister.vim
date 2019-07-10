@@ -17,6 +17,21 @@ let g:loaded_MergeWithRegister = 1
 let s:save_cpo = &cpo
 set cpo&vim
 
+"- configuration ---------------------------------------------------------------
+
+if ! exists('g:MergeWithRegister_UseDiff')
+    let g:MergeWithRegister_UseDiff = 1
+endif
+if ! exists('g:MergeWithRegister_ScratchSplitCommand')
+    let g:MergeWithRegister_ScratchSplitCommand = 'rightbelow new'
+endif
+if ! exists('g:MergeWithRegister_SecondSplitCommand')
+    let g:MergeWithRegister_SecondSplitCommand = 'rightbelow vnew'
+endif
+
+
+"- mappings --------------------------------------------------------------------
+
 " This mapping repeats naturally, because it just sets global things, and Vim is
 " able to repeat the g@ on its own.
 nnoremap <expr> <Plug>MergeWithRegisterOperator MergeWithRegister#OperatorExpression()

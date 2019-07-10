@@ -37,7 +37,7 @@ USAGE						     *MergeWithRegister-usage*
 			windows), one with the original text from the buffer
 			and one with the register contents. If either just
 			consists of a single line, it asks for a split pattern
-			and then temporarily the contents (keeping the
+			and then temporarily unjoins the contents (keeping the
 			separators at each line's end), and automatically
 			rejoins when done. |diff-mode| can be automatically
 			enabled (|g:MergeWithRegister_UseDiff|), and you can
@@ -93,11 +93,11 @@ turn this off: >
 <				     *g:MergeWithRegister_ScratchSplitCommand*
 The split command to open the first scratch buffer (for the original text from
 the buffer): >
-    let g:MergeWithRegister_ScratchSplitCommand = 'rightbelow split'
+    let g:MergeWithRegister_ScratchSplitCommand = 'rightbelow new'
 <				      *g:MergeWithRegister_SecondSplitCommand*
 The split command to open the second scratch buffer (for the register
 contents): >
-    let g:MergeWithRegister_SecondSplitCommand = 'rightbelow vsplit'
+    let g:MergeWithRegister_SecondSplitCommand = 'rightbelow vnew'
 <
 
 						     *MergeWithRegister-remap*
