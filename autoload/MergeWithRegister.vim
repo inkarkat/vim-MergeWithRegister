@@ -177,9 +177,30 @@ function! s:StartMerge() abort
 	call ingo#msg#CustomExceptionMsg('MergeWithRegister')
     endtry
 endfunction
+function! s:SplitContentsIntoLines( contextKey, contents ) abort
+    let l:contents = substitute(a:contents, '\n$', '', '')
+    if l:contents =~# '\n'
+	let l:lines = split(l:contents, '\n', 1)
+    else
+	if &cmdheight > 1
+	    redraw
+	    call ingo#avoidprompt#Echo(l:contents)
+	endif
+	let l:splitPattern = input('Enter separator pattern to temporarily split the single line: ', get(s:context, 'splitPattern', ''))
+	if empty(l:splitPattern)
+	    let l:lines = [l:contents]
+	else
+	    let s:context.splitPattern = l:splitPattern
+	    let s:context[a:contextKey].splitPattern = l:splitPattern
+	    let l:lines = split(l:contents, printf('\%%(%s\)\zs', l:splitPattern), 1)
+	endif
+    endif
+    return l:lines
+endfunction
 function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, Writer ) abort
-    let l:lines = split(substitute(a:contents, '\n$', '', ''), '\n', 1)
+    let l:lines = s:SplitContentsIntoLines(a:contextKey, a:contents)
     if ! has_key(s:context[a:contextKey], 'previousLineNum') | let s:context[a:contextKey].previousLineNum = len(l:lines) | endif  " Also tally the previous number of lines in the register; we already know s:context.previousLineNum.
+
     if ! (a:isWritable ?
     \   ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, l:lines, a:splitCommand) :
     \   ingo#buffer#scratch#Create('', a:name, 0, l:lines, a:splitCommand)
@@ -200,14 +221,21 @@ function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, W
     augroup END
 endfunction
 
-function! MergeWithRegister#WriteText() abort
+function! s:GetScratchLines( contextKey ) abort
     let l:lines = getline(1, line('$'))
+    return (has_key(s:context[a:contextKey], 'splitPattern') ?
+    \   [join(l:lines, '')] :
+    \   l:lines
+    \)
+endfunction
+function! MergeWithRegister#WriteText() abort
+    let l:lines = s:GetScratchLines('text')
     let s:context.result = join(l:lines, "\n") . (s:context.mode =~# '^[lV]$' ? "\n" : '')
     setlocal nomodified
     call s:Report('Replacing', s:context.text.previousLineNum, len(l:lines), 'text')
 endfunction
 function! MergeWithRegister#WriteRegister() abort
-    let l:lines = getline(1, line('$'))
+    let l:lines = s:GetScratchLines('register')
     call setreg(s:register, l:lines, getregtype(s:register)[0]) " Keep the original regtype (but not the width of a blockwise selection!).
     setlocal nomodified
     call s:Report('Updated', s:context.register.previousLineNum, len(l:lines), 'register ' . s:register)
