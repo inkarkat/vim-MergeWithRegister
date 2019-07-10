@@ -56,49 +56,6 @@ endfunction
 function! s:GetRegisterContents() abort
     return (s:register ==# '=' ? g:MergeWithRegister#expr : getreg(s:register))
 endfunction
-function! s:MergeWithRegister( type )
-    if a:type ==# 'visual'
-	let s:context = {
-	\   'type': a:type,
-	\   'previousLineNum': line("'>") - line("'<") + 1,
-	\   'startPos': getpos("'<"),
-	\   'endPos': getpos("'>"),
-	\   'mode': visualmode(),
-	\}
-
-	if &selection ==# 'exclusive' && getpos("'<") == getpos("'>")
-	    let s:context.text = ''
-	else
-	    let s:context.text = ingo#selection#Get()
-	endif
-    else
-	let s:context = {
-	\   'type': a:type,
-	\   'previousLineNum': line("']") - line("'[") + 1,
-	\   'startPos': getpos("'["),
-	\   'endPos': getpos("']"),
-	\   'mode': a:type[0],
-	\}
-
-	if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
-	    let s:context.text = ''
-	else
-	    " Note: Need to use an "inclusive" selection to make `] include
-	    " the last moved-over character.
-	    let l:save_selection = &selection
-	    set selection=inclusive
-	    try
-		let s:context.text = ingo#register#KeepRegisterExecuteOrFunc(
-		    \'execute "silent normal! g`[' . (a:type ==# 'line' ? 'V' : 'v') . 'g`]y" | return @"'
-		\)
-	    finally
-		let &selection = l:save_selection
-	    endtry
-	endif
-    endif
-
-    call s:StartMerge()
-endfunction
 function! MergeWithRegister#Operator( type, ... )
     let l:pasteText = getreg(s:register, 1) " Expression evaluation inside function context may cause errors, therefore get unevaluated expression when s:register ==# '='.
     let l:regType = getregtype(s:register)
@@ -157,6 +114,48 @@ endfunction
 
 
 
+function! s:MergeWithRegister( type )
+    if a:type ==# 'visual'
+	let s:context = {
+	\   'type': a:type,
+	\   'previousLineNum': line("'>") - line("'<") + 1,
+	\   'startPos': getpos("'<"),
+	\   'endPos': getpos("'>"),
+	\   'mode': visualmode(),
+	\}
+
+	let s:context.text = (&selection ==# 'exclusive' && getpos("'<") == getpos("'>") ?
+	\   '' :
+	\   ingo#selection#Get()
+	\)
+    else
+	let s:context = {
+	\   'type': a:type,
+	\   'previousLineNum': line("']") - line("'[") + 1,
+	\   'startPos': getpos("'["),
+	\   'endPos': getpos("']"),
+	\   'mode': a:type[0],
+	\}
+
+	if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
+	    let s:context.text = ''
+	else
+	    " Note: Need to use an "inclusive" selection to make `] include
+	    " the last moved-over character.
+	    let l:save_selection = &selection
+	    set selection=inclusive
+	    try
+		let s:context.text = ingo#register#KeepRegisterExecuteOrFunc(
+		    \'execute "silent normal! g`[' . (a:type ==# 'line' ? 'V' : 'v') . 'g`]y" | return @"'
+		\)
+	    finally
+		let &selection = l:save_selection
+	    endtry
+	endif
+    endif
+
+    call s:StartMerge()
+endfunction
 function! s:StartMerge() abort
     let s:context.buffers = []
     let s:context.filetype = &l:filetype
@@ -287,11 +286,6 @@ function! s:Report( report, action, newLineNum, ... ) abort
 	echomsg printf('%s %d line%s%s', a:action, s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's'), (a:0 ? ' in ' . a:1 : '')) .
 	    \(s:context.previousLineNum == a:newLineNum ? '' : printf(' with %d line%s', a:newLineNum, (a:newLineNum == 1 ? '' : 's')))
     endif
-endfunction
-
-" Debugging
-function! MergeWithRegister#Context() abort
-    echomsg '****' s:register string(s:context)
 endfunction
 
 " vim: set ts=8 sts=4 sw=4 noexpandtab ff=unix fdm=syntax :
