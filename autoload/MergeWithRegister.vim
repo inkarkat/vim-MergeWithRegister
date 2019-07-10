@@ -159,7 +159,7 @@ endfunction
 function! s:StartMerge() abort
     let s:context.buffers = []
     let s:context.filetype = &l:filetype
-    let s:context.winId = win_getid()   " TODO: Better impl
+    let s:context.currentBuffer = ingo#window#switches#WinSaveCurrentBuffer(1)
     let l:text = s:context.text
     let l:register = s:GetRegisterContents()
     let l:name = expand('%:t') | if empty(l:name) | let l:name = 'unnamed' | endif
@@ -213,7 +213,13 @@ function! MergeWithRegister#EndMerge() abort
 	silent! noautocmd close!    | " Use :noautocmd to avoid triggering us again recursively from the other scratch buffer.
     endfor
 
-    call win_gotoid(s:context.winId)   " TODO: Better impl
+    try
+	call ingo#window#switches#WinRestoreCurrentBuffer(s:context.currentBuffer, 1)
+    catch /^WinRestoreCurrentBuffer:/
+	call ingo#msg#ErrorMsg('Cannot locate original buffer')
+	return
+    endtry
+
     if has_key(s:context, 'result')
 	call ingo#register#KeepRegisterExecuteOrFunc(function('MergeWithRegister#MergeResult'), s:context.result, s:context.mode)
     endif
