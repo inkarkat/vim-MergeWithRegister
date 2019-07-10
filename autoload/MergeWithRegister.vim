@@ -9,7 +9,6 @@
 "   The VIM LICENSE applies to this script; see ':help copyright'.
 "
 " Maintainer:	Ingo Karkat <ingo@karkat.de>
-"
 
 function! MergeWithRegister#SetRegister()
     let s:register = v:register
@@ -53,29 +52,51 @@ function! s:CorrectForRegtype( type, register, regType, pasteText )
 
     return 0
 endfunction
-function! s:PreparePasteRegister( type, save_reg, save_regmode ) abort
-    if s:register ==# '"'
-	" The unnamed register has been used for retrieving the original text,
-	" we need to restore it now.
-	call setreg('"', a:save_reg, a:save_regmode)
-	return s:register
-    elseif s:register ==# '='
-	" Cannot evaluate the expression register within a function; unscoped
-	" variables do not refer to the global scope. Therefore, evaluation
-	" happened earlier in the mappings.
-	" To get the expression result into the buffer, we use the unnamed
-	" register; this will be restored, anyway.
-	call setreg('"', g:MergeWithRegister#expr)
-	call s:CorrectForRegtype(a:type, '"', getregtype('"'), g:MergeWithRegister#expr)
-	" Must not clean up the global temp variable to allow command
-	" repetition.
-	"unlet g:MergeWithRegister#expr
-	return  '"'
-    else
-	return s:register
-    endif
+function! s:GetRegisterContents() abort
+    return (s:register ==# '=' ? g:MergeWithRegister#expr : getreg(s:register))
 endfunction
 function! s:MergeWithRegister( type )
+    if a:type ==# 'visual'
+	let s:context = {
+	\   'type': a:type,
+	\   'previousLineNum': line("'>") - line("'<") + 1,
+	\   'startPos': getpos("'<"),
+	\   'endPos': getpos("'>"),
+	\   'mode': visualmode(),
+	\}
+
+	if &selection ==# 'exclusive' && getpos("'<") == getpos("'>")
+	    let s:context.text = ''
+	else
+	    let s:context.text = ingo#selection#Get()
+	endif
+    else
+	let s:context = {
+	\   'type': a:type,
+	\   'previousLineNum': line("']") - line("'[") + 1,
+	\   'startPos': getpos("'["),
+	\   'endPos': getpos("']"),
+	\   'mode': '',
+	\}
+
+	if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
+	    let s:context.text = ''
+	else
+	    " Note: Need to use an "inclusive" selection to make `] include
+	    " the last moved-over character.
+	    let l:save_selection = &selection
+	    set selection=inclusive
+	    try
+		let s:context.text = ingo#register#KeepRegisterExecuteOrFunc(
+		    \'execute "silent normal! g`[' . (a:type ==# 'line' ? 'V' : 'v') . 'g`]y" | return @"'
+		\)
+	    finally
+		let &selection = l:save_selection
+	    endtry
+	endif
+    endif
+endfunction
+function! MergeWithRegister#Merged() abort
     " With a put in visual mode, the selected text will be replaced with the
     " contents of the register. This works better than first deleting the
     " selection into the black-hole register and then doing the insert; as
@@ -91,47 +112,37 @@ function! s:MergeWithRegister( type )
     let l:save_regmode = getregtype('"')
 
     try
-	if a:type ==# 'visual'
-"****D echomsg '**** visual' string(getpos("'<")) string(getpos("'>"))
-	    let l:previousLineNum = line("'>") - line("'<") + 1
-	    if &selection ==# 'exclusive' && getpos("'<") == getpos("'>")
-		if ! s:Merge('', s:PreparePasteRegister(a:type, l:save_reg, l:save_regmode)) | return | endif
-		" In case of an empty selection, just paste before the cursor
-		" position; reestablishing the empty selection would override
-		" the current character, a peculiarity of how selections work.
-		silent normal! P
-	    else
-		silent normal! gvy
-		let l:text = @"
-		if ! s:Merge(l:text, s:PreparePasteRegister(a:type, l:save_reg, l:save_regmode)) | return | endif
-		silent normal! gvp
-	    endif
+	let l:result = get(s:context, 'result', 'TODO')
+	call setreg('"', l:result)
+	if s:register ==# '='
+	    call s:CorrectForRegtype(s:context.type, '"', getregtype('"'), l:result)
+	endif
+
+	if empty(s:context.text)
+	    " In case of an empty text / selection, just paste before the cursor
+	    " position.
+	    silent normal! P
+	elseif s:context.type ==# 'visual'
+	    " TODO: Reestablish selection.
+	    silent normal! gvp
 	else
-"****D echomsg '**** operator' string(getpos("'[")) string(getpos("']"))
-	    let l:previousLineNum = line("']") - line("'[") + 1
-	    if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
-		if ! s:Merge('', s:PreparePasteRegister(a:type, l:save_reg, l:save_regmode)) | return | endif
-		silent normal! P
-	    else
-		" Note: Need to use an "inclusive" selection to make `] include
-		" the last moved-over character.
-		let l:save_selection = &selection
-		set selection=inclusive
-		try
-		    execute 'silent normal! g`[' . (a:type ==# 'line' ? 'V' : 'v') . 'g`]y'
-		    let l:text = @"
-		    if ! s:Merge(l:text, s:PreparePasteRegister(a:type, l:save_reg, l:save_regmode)) | return | endif
-		    execute 'silent normal! g`[' . (a:type ==# 'line' ? 'V' : 'v') . 'g`]p'
-		finally
-		    let &selection = l:save_selection
-		endtry
-	    endif
+	    call ingo#change#Set(s:context.startPos, s:context.endPos)
+
+	    " Note: Need to use an "inclusive" selection to make `] include
+	    " the last moved-over character.
+	    let l:save_selection = &selection
+	    set selection=inclusive
+	    try
+		execute 'silent normal! g`[' . (s:context.type ==# 'line' ? 'V' : 'v') . 'g`]p'
+	    finally
+		let &selection = l:save_selection
+	    endtry
 	endif
 
 	let l:newLineNum = line("']") - line("'[") + 1
-	if l:previousLineNum >= &report || l:newLineNum >= &report
-	    echomsg printf('Replaced %d line%s', l:previousLineNum, (l:previousLineNum == 1 ? '' : 's')) .
-	    \   (l:previousLineNum == l:newLineNum ? '' : printf(' with %d line%s', l:newLineNum, (l:newLineNum == 1 ? '' : 's')))
+	if s:context.previousLineNum >= &report || l:newLineNum >= &report
+	    echomsg printf('Replaced %d line%s', s:context.previousLineNum, (s:context.previousLineNum == 1 ? '' : 's')) .
+	    \   (s:context.previousLineNum == l:newLineNum ? '' : printf(' with %d line%s', l:newLineNum, (l:newLineNum == 1 ? '' : 's')))
 	endif
     finally
 	call setreg('"', l:save_reg, l:save_regmode)
@@ -194,11 +205,8 @@ function! MergeWithRegister#VisualMode()
     return l:keys
 endfunction
 
-function! s:Merge( text, register ) abort
-    echomsg '****' string(a:text) '->' getreg(a:register)
-    call setreg('"', getreg(a:register)[0:2] . a:text[0:2])
-    call setreg(s:register, '[' . getreg(a:register) . ']')
-    return 1
+function! MergeWithRegister#Context() abort
+    echomsg '****' s:register string(s:context)
 endfunction
 
 " vim: set ts=8 sts=4 sw=4 noexpandtab ff=unix fdm=syntax :
