@@ -61,7 +61,7 @@ function! MergeWithRegister#Operator( type, ... )
     let l:regType = getregtype(s:register)
     let l:isCorrected = s:CorrectForRegtype(a:type, s:register, l:regType, l:pasteText)
     try
-	call s:MergeWithRegister(a:type, (a:0 ? a:1 : ''), (a:0 >= 2 && a:2))
+	call s:MergeWithRegister(a:type, (a:0 ? a:1 : ''), (a:0 >= 2 && a:2), "\<Plug>MergeWithRegisterVisual")
     finally
 	if l:isCorrected
 	    " Undo the temporary change of the register.
@@ -101,10 +101,11 @@ endfunction
 
 
 
-function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount )
+function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount, visualRepeatMapping )
     let s:context = {
     \   'type': a:type,
     \   'repeatMapping': a:repeatMapping,
+    \   'visualRepeatMapping': a:visualRepeatMapping,
     \   'register': {},
     \}
     if a:type ==# 'visual'
@@ -282,7 +283,7 @@ function! MergeWithRegister#EndMerge() abort
 	" the operator-pending mapping.
 	silent! call repeat#set("\<Plug>MergeWithRegisterExpressionSpecial")
     endif
-    silent! call visualrepeat#set("\<Plug>MergeWithRegisterVisual")
+    silent! call visualrepeat#set(s:context.visualRepeatMapping)
 
     unlet s:context
 endfunction
