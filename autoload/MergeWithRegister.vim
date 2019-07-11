@@ -155,6 +155,7 @@ function! s:StartMerge() abort
     let s:context.buffers = []
     let s:context.filetype = &l:filetype
     let s:context.currentBuffer = ingo#window#switches#WinSaveCurrentBuffer(1)
+    let s:context.previousWinNr = winnr('#') ? winnr('#') : 1
     let l:register = s:GetRegisterContents()
     let l:name = expand('%:t') | if empty(l:name) | let l:name = 'unnamed' | endif
     let l:tabPrefixCommand = (g:MergeWithRegister_UseDiff && ingo#window#special#HasDiffWindow() ? 'tab ' : '') " DWIM: Open scratch buffers in a separate tab page if we're already diffing here.
@@ -253,6 +254,9 @@ function! MergeWithRegister#EndMerge() abort
 
     try
 	call ingo#window#switches#WinRestoreCurrentBuffer(s:context.currentBuffer, 1)
+	let l:originalWinNr = winnr()
+	execute s:context.previousWinNr . 'wincmd w'
+	execute l:originalWinNr . 'wincmd w'
     catch /^WinRestoreCurrentBuffer:/
 	call ingo#msg#ErrorMsg('Cannot locate original buffer')
 	return
