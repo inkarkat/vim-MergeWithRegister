@@ -102,35 +102,35 @@ endfunction
 
 
 function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount )
+    let s:context = {
+    \   'type': a:type,
+    \   'repeatMapping': a:repeatMapping,
+    \   'register': {},
+    \}
     if a:type ==# 'visual'
-	let s:context = {
-	\   'type': a:type,
-	\   'repeatMapping': a:repeatMapping,
+	call extend(s:context, {
 	\   'isUseRepeatCount': a:isUseRepeatCount,
 	\   'text': {
 	\       'previousLineNum': line("'>") - line("'<") + 1,
 	\   },
-	\   'register': {},
 	\   'startPos': getpos("'<"),
 	\   'endPos': getpos("'>"),
 	\   'mode': visualmode(),
-	\}
+	\})
 
 	let s:context.text.contents = (&selection ==# 'exclusive' && getpos("'<") == getpos("'>") ?
 	\   '' :
 	\   ingo#selection#Get()
 	\)
     else
-	let s:context = {
-	\   'type': a:type,
+	call extend(s:context, {
 	\   'text': {
 	\       'previousLineNum': line("']") - line("'[") + 1,
 	\   },
-	\   'register': {},
 	\   'startPos': getpos("'["),
 	\   'endPos': getpos("']"),
 	\   'mode': a:type[0],
-	\}
+	\})
 
 	if ingo#pos#IsOnOrAfter(getpos("'[")[1:2], getpos("']")[1:2])
 	    let s:context.text.contents = ''
