@@ -56,12 +56,12 @@ endfunction
 function! s:GetRegisterContents() abort
     return (s:register ==# '=' ? g:MergeWithRegister#expr : getreg(s:register))
 endfunction
-function! MergeWithRegister#Operator( type, ... )
+function! s:Operator( type, ... )
     let l:pasteText = getreg(s:register, 1) " Expression evaluation inside function context may cause errors, therefore get unevaluated expression when s:register ==# '='.
     let l:regType = getregtype(s:register)
     let l:isCorrected = s:CorrectForRegtype(a:type, s:register, l:regType, l:pasteText)
     try
-	call s:MergeWithRegister(a:type, (a:0 ? a:1 : ''), (a:0 >= 2 && a:2), "\<Plug>MergeWithRegisterVisual")
+	call s:MergeWithRegister(a:type, (a:0 ? a:1 : ''), (a:0 >= 2 && a:2))
     finally
 	if l:isCorrected
 	    " Undo the temporary change of the register.
@@ -71,9 +71,15 @@ function! MergeWithRegister#Operator( type, ... )
 	endif
     endtry
 endfunction
-function! MergeWithRegister#OperatorExpression()
+function! MergeWithRegister#Operator( ... )
+    let s:context = {
+    \   'visualRepeatMapping': "\<Plug>MergeWithRegisterVisual"
+    \}
+    call call('s:Operator', a:000)
+endfunction
+function! MergeWithRegister#OperatorExpression( opfunc )
     call MergeWithRegister#SetRegister()
-    set opfunc=MergeWithRegister#Operator
+    let &opfunc = a:opfunc
 
     let l:keys = 'g@'
 
@@ -101,13 +107,12 @@ endfunction
 
 
 
-function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount, visualRepeatMapping )
-    let s:context = {
+function! s:MergeWithRegister( type, repeatMapping, isUseRepeatCount )
+    call extend(s:context,  {
     \   'type': a:type,
     \   'repeatMapping': a:repeatMapping,
-    \   'visualRepeatMapping': a:visualRepeatMapping,
     \   'register': {},
-    \}
+    \})
     if a:type ==# 'visual'
 	call extend(s:context, {
 	\   'isUseRepeatCount': a:isUseRepeatCount,
