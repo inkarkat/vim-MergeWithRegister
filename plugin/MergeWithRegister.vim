@@ -42,6 +42,7 @@ nnoremap <expr> <Plug>MergeWithReIndentOperator MergeWithRegister#OperatorExpres
 " in the expression evaluation then.
 nnoremap <silent> <Plug>MergeWithRegisterExpressionSpecial :<C-u>let g:MergeWithRegister#expr = getreg('=')<Bar>execute 'normal!' v:count1 . '.'<CR>
 
+
 " This mapping needs repeat.vim to be repeatable, because it consists of
 " multiple steps (visual selection + 'c' command inside
 " MergeWithRegister#Operator).
@@ -56,6 +57,18 @@ nnoremap <silent> <Plug>MergeWithRegisterLine
 \execute 'normal! V' . v:count1 . "_\<lt>Esc>"<Bar>
 \call MergeWithRegister#Operator('visual', "\<lt>Plug>MergeWithRegisterLine", 1)<CR>
 
+nnoremap <silent> <Plug>MergeWithReIndentLine
+\ :<C-u>call setline('.', getline('.'))<Bar>
+\execute 'silent! call repeat#setreg("\<lt>Plug>MergeWithReIndentLine", v:register)'<Bar>
+\call MergeWithRegister#SetRegister()<Bar>
+\if MergeWithRegister#IsExprReg()<Bar>
+\    let g:MergeWithRegister#expr = getreg('=')<Bar>
+\endif<Bar>
+\call MergeWithRegister#SetCount()<Bar>
+\execute 'normal! V' . v:count1 . "_\<lt>Esc>"<Bar>
+\call MergeWithRegister#IndentOperator('visual', "\<lt>Plug>MergeWithReIndentLine", 1)<CR>
+
+
 " Repeat not defined in visual mode, but enabled through visualrepeat.vim.
 vnoremap <silent> <Plug>MergeWithRegisterVisual
 \ :<C-u>call setline('.', getline('.'))<Bar>
@@ -65,6 +78,16 @@ vnoremap <silent> <Plug>MergeWithRegisterVisual
 \    let g:MergeWithRegister#expr = getreg('=')<Bar>
 \endif<Bar>
 \call MergeWithRegister#Operator('visual', "\<lt>Plug>MergeWithRegisterVisual")<CR>
+
+vnoremap <silent> <Plug>MergeWithReIndentVisual
+\ :<C-u>call setline('.', getline('.'))<Bar>
+\execute 'silent! call repeat#setreg("\<lt>Plug>MergeWithReIndentVisual", v:register)'<Bar>
+\call MergeWithRegister#SetRegister()<Bar>
+\if MergeWithRegister#IsExprReg()<Bar>
+\    let g:MergeWithRegister#expr = getreg('=')<Bar>
+\endif<Bar>
+\call MergeWithRegister#IndentOperator('visual', "\<lt>Plug>MergeWithReIndentVisual")<CR>
+
 
 " A normal-mode repeat of the visual mapping is triggered by repeat.vim. It
 " establishes a new selection at the cursor position, of the same mode and size
@@ -83,6 +106,17 @@ nnoremap <silent> <Plug>MergeWithRegisterVisual
 \execute 'normal!' MergeWithRegister#VisualMode()<Bar>
 \call MergeWithRegister#Operator('visual', "\<lt>Plug>MergeWithRegisterVisual")<CR>
 
+nnoremap <silent> <Plug>MergeWithReIndentVisual
+\ :<C-u>call setline('.', getline('.'))<Bar>
+\execute 'silent! call repeat#setreg("\<lt>Plug>MergeWithReIndentVisual", v:register)'<Bar>
+\call MergeWithRegister#SetRegister()<Bar>
+\if MergeWithRegister#IsExprReg()<Bar>
+\    let g:MergeWithRegister#expr = getreg('=')<Bar>
+\endif<Bar>
+\execute 'normal!' MergeWithRegister#VisualMode()<Bar>
+\call MergeWithRegister#IndentOperator('visual', "\<lt>Plug>MergeWithReIndentVisual")<CR>
+
+
 
 if ! hasmapto('<Plug>MergeWithRegisterOperator', 'n')
     nmap mr <Plug>MergeWithRegisterOperator
@@ -92,6 +126,16 @@ if ! hasmapto('<Plug>MergeWithRegisterLine', 'n')
 endif
 if ! hasmapto('<Plug>MergeWithRegisterVisual', 'x')
     xmap mr <Plug>MergeWithRegisterVisual
+endif
+
+if ! hasmapto('<Plug>MergeWithReIndentOperator', 'n')
+    nmap mR <Plug>MergeWithReIndentOperator
+endif
+if ! hasmapto('<Plug>MergeWithReIndentLine', 'n')
+    nmap mRR <Plug>MergeWithReIndentLine
+endif
+if ! hasmapto('<Plug>MergeWithReIndentVisual', 'x')
+    xmap mR <Plug>MergeWithReIndentVisual
 endif
 
 let &cpo = s:save_cpo

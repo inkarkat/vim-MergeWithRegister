@@ -51,15 +51,16 @@ USAGE						     *MergeWithRegister-usage*
 			To replace from the cursor position to the end of the
 			line use ["x]mr$
 {Visual}["x]mr		Merge the selection with the contents of register x.
-								  *mrR* *v_mR*
-[count]["x]mrR		Merge [count] lines with the contents of register x
-			while ignoring any common indent. When updating, the
-			indent is adjusted to the first replaced line (like
-			pasting with |]p|).
+							     *mR* *mRR* *v_mR*
+[count]["x]mR{motion}	Merge {motion} text with the contents of register x
+			while ignoring any common indent (after potentially
+			splitting a single line). When updating, the indent is
+			adjusted to the first replaced line (like pasting with
+			|]p|).
+[count]["x]mRR		Merge [count] lines with the contents of register x
+			while ignoring any common indent.
 {Visual}["x]mR		Merge the selection with the contents of register x
-			and adjust the indent to the first selected line.
-			As the replacement is always entire lines, this only
-			works with linewise selections (|V|).
+			while ignoring any common indent.
 
 ==============================================================================
 INSTALLATION				      *MergeWithRegister-installation*
