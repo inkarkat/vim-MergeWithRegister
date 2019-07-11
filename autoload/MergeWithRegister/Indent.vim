@@ -1,6 +1,7 @@
 " MergeWithRegister/Indent.vim: Merge text without common indent.
 "
 " DEPENDENCIES:
+"   - ingo-library.vim plugin
 "
 " Copyright: (C) 2019 Ingo Karkat
 "   The VIM LICENSE applies to this script; see ':help copyright'.
@@ -20,6 +21,7 @@ function! MergeWithRegister#Indent#Encode( context, contextKey ) abort
     let l:indentLevel = ingo#indent#GetIndentLevel(1)
     let a:context[a:contextKey].indentLevel = l:indentLevel
     call ingo#indent#RangeSeveralTimes(1, line('$'), '<', l:indentLevel)
+    setlocal nomodified
 endfunction
 
 function! MergeWithRegister#Indent#Decode( context, contextKey ) abort
