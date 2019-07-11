@@ -35,6 +35,7 @@ endif
 " This mapping repeats naturally, because it just sets global things, and Vim is
 " able to repeat the g@ on its own.
 nnoremap <expr> <Plug>MergeWithRegisterOperator MergeWithRegister#OperatorExpression('MergeWithRegister#Operator')
+nnoremap <expr> <Plug>MergeWithReIndentOperator MergeWithRegister#OperatorExpression('MergeWithRegister#IndentOperator')
 " But we need repeat.vim to get the expression register re-evaluated: When Vim's
 " . command re-invokes 'opfunc', the expression isn't re-evaluated, an
 " inconsistency with the other mappings. We creatively use repeat.vim to sneak

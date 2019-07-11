@@ -77,6 +77,14 @@ function! MergeWithRegister#Operator( ... )
     \}
     call call('s:Operator', a:000)
 endfunction
+function! MergeWithRegister#IndentOperator( ... )
+    let s:context = {
+    \   'visualRepeatMapping': "\<Plug>MergeWithReIndentVisual",
+    \   'encoder': function('MergeWithRegister#Indent#Encode'),
+    \   'decoder': function('MergeWithRegister#Indent#Decode'),
+    \}
+    call call('s:Operator', a:000)
+endfunction
 function! MergeWithRegister#OperatorExpression( opfunc )
     call MergeWithRegister#SetRegister()
     let &opfunc = a:opfunc
@@ -222,6 +230,8 @@ function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, W
     filetype detect
     if empty(&l:filetype) | let &l:filetype = s:context.filetype | endif
 
+    call call(get(s:context, 'encoder', ''), [s:context, a:contextKey])
+
     if g:MergeWithRegister_UseDiff | setl diff | endif
 
     augroup MergeWithRegister
@@ -230,11 +240,14 @@ function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, W
 endfunction
 
 function! s:GetScratchLines( contextKey ) abort
+    call call(get(s:context, 'decoder', ''), [s:context, a:contextKey])
     let l:lines = getline(1, line('$'))
-    return (has_key(s:context[a:contextKey], 'splitPattern') ?
-    \   [len(l:lines), [join(l:lines, '')]] :
-    \   [len(l:lines), l:lines]
+    let l:contents = (has_key(s:context[a:contextKey], 'splitPattern') ?
+    \   [join(l:lines, '')] :
+    \   l:lines
     \)
+
+    return [len(l:lines), l:contents]
 endfunction
 function! MergeWithRegister#WriteText() abort
     let [l:elementNum, l:lines] = s:GetScratchLines('text')
