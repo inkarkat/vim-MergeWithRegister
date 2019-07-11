@@ -82,6 +82,7 @@ function! MergeWithRegister#IndentOperator( ... )
     \   'visualRepeatMapping': "\<Plug>MergeWithReIndentVisual",
     \   'encoder': function('MergeWithRegister#Indent#Encode'),
     \   'decoder': function('MergeWithRegister#Indent#Decode'),
+    \   'originalIndentSettings': {'tabstop': &tabstop, 'softtabstop': &softtabstop, 'shiftwidth': &shiftwidth, 'expandtab': &expandtab},
     \}
     call call('s:Operator', a:000)
 endfunction
@@ -225,8 +226,7 @@ function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, W
     endif
     call add(s:context.buffers, bufnr(''))
 
-    " Detect the filetype the contents, and fall back to the original buffer's
-    " filetype.
+    " Detect the filetype, and fall back to the original buffer's filetype.
     filetype detect
     if empty(&l:filetype) | let &l:filetype = s:context.filetype | endif
 
