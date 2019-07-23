@@ -218,10 +218,7 @@ function! s:OpenScratch( contextKey, isWritable, splitCommand, name, contents, W
     let l:lines = s:SplitContentsIntoLines(a:contextKey, a:contents)
     if ! has_key(s:context[a:contextKey], 'previousLineNum') | let s:context[a:contextKey].previousLineNum = len(l:lines) | endif  " Also tally the previous number of lines in the register; we already know s:context.previousLineNum.
 
-    if ! (a:isWritable ?
-    \   ingo#buffer#scratch#CreateWithWriter(a:name, a:Writer, l:lines, a:splitCommand) :
-    \   ingo#buffer#scratch#Create('', a:name, 0, l:lines, a:splitCommand)
-    \)
+    if ! ingo#buffer#scratch#CreateWithWriter(a:name, (a:isWritable ? a:Writer : ''), l:lines, a:splitCommand)
 	throw 'MergeWithRegister: Failed to open scratch buffer for ' . a:name
     endif
     call add(s:context.buffers, bufnr(''))
