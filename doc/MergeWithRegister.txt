@@ -110,7 +110,7 @@ To uninstall, use the |:RmVimball| command.
 DEPENDENCIES				      *MergeWithRegister-dependencies*
 
 - Requires Vim 7.0 or higher.
-- Requires the |ingo-library.vim| plugin (vimscript #4433), version 1.039 or
+- Requires the |ingo-library.vim| plugin (vimscript #4433), version 1.042 or
   higher.
 
 ==============================================================================
@@ -166,7 +166,7 @@ First published version.
 Started development.
 
 ==============================================================================
-Copyright: (C) 2019 Ingo Karkat
+Copyright: (C) 2019-2020 Ingo Karkat
 The VIM LICENSE applies to this plugin; see |copyright|.
 
 Maintainer:	Ingo Karkat <ingo@karkat.de>
